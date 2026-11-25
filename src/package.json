@@ -1,0 +1,11 @@
+{
+  "name": "@btld/core",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Florian Rueberg",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.js"
+  }
+}
