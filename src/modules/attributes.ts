@@ -2,21 +2,25 @@ import { ConfigModules, hasDefault, hasObserve, ParamsObserved } from '../types/
 import { BtldElement, $flagSetupDone, $flagStopAttrPropLoop, $propState } from '../types/element';
 import { safeDeepClone } from '../internal/utils';
 
-export const $_propToType = Symbol();
-export const $_propToAttr = Symbol();
-export const $_attrToProp = Symbol();
-export const $_coerceAttribute = Symbol();
-export const $_coercePropertyStrict = Symbol();
-export const $_toKebabCase = Symbol();
-export const $_stoppedLoop = Symbol();
-export const $_syncAttribute = Symbol();
+export const $observed = Symbol();
+export const $changed = Symbol();
+export const $reflect = Symbol();
+export const $setup = Symbol();
+export const $propToType = Symbol();
+export const $propToAttr = Symbol();
+export const $attrToProp = Symbol();
+export const $coerceAttribute = Symbol();
+export const $coercePropertyStrict = Symbol();
+export const $toKebabCase = Symbol();
+export const $stoppedLoop = Symbol();
+export const $syncAttribute = Symbol();
 
 export class ModuleAttributes {
-  [$_propToType] = new Map<string, ParamsObserved>();
-  [$_propToAttr] = new Map<string, string>();
-  [$_attrToProp] = new Map<string, string>();
+  [$propToType] = new Map<string, ParamsObserved>();
+  [$propToAttr] = new Map<string, string>();
+  [$attrToProp] = new Map<string, string>();
 
-  [$_coerceAttribute](value: string | null, type: ParamsObserved) {
+  [$coerceAttribute](value: string | null, type: ParamsObserved) {
     if (type.observe === 'boolean') return value !== null;
     if (value === null) return undefined;
     if (type.observe === 'string') return value;
@@ -26,18 +30,18 @@ export class ModuleAttributes {
     }
   }
 
-  [$_coercePropertyStrict](value: unknown, type: ParamsObserved) {
+  [$coercePropertyStrict](value: unknown, type: ParamsObserved) {
     if (type.observe === 'boolean') return value === true ? '' : null;
     if (type.observe === 'string' && typeof value === 'string') return value;
     if (type.observe === 'number' && Number.isFinite(value)) return '' + value;
     return null;
   }
 
-  [$_toKebabCase](str: string): string {
+  [$toKebabCase](str: string): string {
     return str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   }
 
-  [$_stoppedLoop](element: BtldElement, prop: string, action: () => void): true | undefined {
+  [$stoppedLoop](element: BtldElement, prop: string, action: () => void): true | undefined {
     element[$flagStopAttrPropLoop] ??= new Set();
     if (element[$flagStopAttrPropLoop].has(prop)) return true;
     try {
@@ -48,8 +52,8 @@ export class ModuleAttributes {
     }
   }
 
-  [$_syncAttribute](element: BtldElement, type: ParamsObserved, attr: string, raw: unknown) {
-    const value = this[$_coercePropertyStrict](raw, type);
+  [$syncAttribute](element: BtldElement, type: ParamsObserved, attr: string, raw: unknown) {
+    const value = this[$coercePropertyStrict](raw, type);
     if (value === null && raw != null && raw !== false) {
       console.warn(`Attribute "${attr}" removed, expects ${type.observe} got ${typeof raw}`);
     }
@@ -61,68 +65,68 @@ export class ModuleAttributes {
   constructor(config: ConfigModules) {
     for (const prop in config.props) {
       if (!hasObserve(config.props[prop])) continue;
-      const attr = this[$_toKebabCase](prop);
-      const existing = this[$_attrToProp].get(attr);
+      const attr = this[$toKebabCase](prop);
+      const existing = this[$attrToProp].get(attr);
       if (existing !== prop) throw new Error(`Properties "${existing}" and "${prop}" both map to attribute "${attr}".`);
 
-      this[$_propToType].set(prop, config.props[prop]);
-      this[$_propToAttr].set(prop, attr);
-      this[$_attrToProp].set(attr, prop);
+      this[$propToType].set(prop, config.props[prop]);
+      this[$propToAttr].set(prop, attr);
+      this[$attrToProp].set(attr, prop);
     }
   }
 
-  observed(inherit: string[] = []) {
-    return [...inherit, ...this[$_propToAttr].values()];
+  [$observed](inherit: string[] = []) {
+    return [...inherit, ...this[$propToAttr].values()];
   }
 
   // called by attributeChangedCallback
 
-  changed(element: BtldElement, attr: string, raw: null | string) {
+  [$changed](element: BtldElement, attr: string, raw: null | string) {
     if (!element[$flagSetupDone]) return;
     element[$propState] ??= {};
 
-    const prop = this[$_attrToProp].get(attr);
+    const prop = this[$attrToProp].get(attr);
     if (!prop) return;
 
-    const type = this[$_propToType].get(prop)!;
-    const value = this[$_coerceAttribute](raw, type);
+    const type = this[$propToType].get(prop)!;
+    const value = this[$coerceAttribute](raw, type);
 
-    if (this[$_stoppedLoop](element, prop, () => ((element as any)[prop] = value))) return;
+    if (this[$stoppedLoop](element, prop, () => ((element as any)[prop] = value))) return;
 
     if (type.reflect && !Object.is(element[$propState][prop], value)) {
       // CASE: Property setter calls propertyChangedCallback that normalized the value
-      this.reflect(element, prop, element[$propState][prop]);
+      this[$reflect](element, prop, element[$propState][prop]);
     }
   }
 
   // called by property setter
 
-  reflect(element: BtldElement, prop: string, raw: unknown) {
+  [$reflect](element: BtldElement, prop: string, raw: unknown) {
     if (!element[$flagSetupDone]) return;
 
-    const attr = this[$_propToAttr].get(prop);
+    const attr = this[$propToAttr].get(prop);
     if (!attr) return;
 
-    const type = this[$_propToType].get(prop)!;
-    this[$_stoppedLoop](element, prop, () => this[$_syncAttribute](element, type, attr, raw));
+    const type = this[$propToType].get(prop)!;
+    this[$stoppedLoop](element, prop, () => this[$syncAttribute](element, type, attr, raw));
   }
 
   // called just before setupCallback
 
-  setup(element: BtldElement) {
+  [$setup](element: BtldElement) {
     // $flagSetupDone is already true, so using the property setters would fire propertyChangedCallback.
     // To avoid that we write state directly and use the loop guard to stop changed() from running.
 
     const state = (element[$propState] ??= {});
 
-    for (const [prop, type] of this[$_propToType]) {
-      const attr = this[$_propToAttr].get(prop)!;
+    for (const [prop, type] of this[$propToType]) {
+      const attr = this[$propToAttr].get(prop)!;
 
       if (Object.hasOwn(state, prop)) {
         // PRECEDENCE 1: has preupgrade property or was manually assigned
       } else if (type.observe === 'boolean' || element.hasAttribute(attr)) {
         // PRECEDENCE 2: attribute is meaningful -> update prop
-        state[prop] = this[$_coerceAttribute](element.getAttribute(attr), type);
+        state[prop] = this[$coerceAttribute](element.getAttribute(attr), type);
         continue; // no reflection
       } else if (hasDefault(type)) {
         // PRECEDENCE 3: use defaults
@@ -131,7 +135,7 @@ export class ModuleAttributes {
         // FALLBACK UNINITIALIZED
         continue; // no reflection
       }
-      if (type.reflect) this.reflect(element, prop, state[prop]);
+      if (type.reflect) this[$reflect](element, prop, state[prop]);
     }
   }
 }

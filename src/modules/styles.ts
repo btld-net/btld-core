@@ -1,29 +1,35 @@
 import { ConfigModules } from '../types/config';
 
-export const $_hoisted = Symbol();
+export const $config = Symbol();
+export const $hoist = Symbol();
+export const $hoisted = Symbol();
 
 const isDocument = (node: Node): node is Document => node.nodeType === 9;
 const isDocumentFragment = (node: Node): node is DocumentFragment => node.nodeType === 11;
 
 export class ModuleHoistStyles {
-  static [$_hoisted] = new WeakMap<Document | DocumentFragment, Set<string>>();
-  constructor(protected config: ConfigModules) {}
+  static [$hoisted] = new WeakMap<Document | DocumentFragment, Set<string>>();
+  
+  [$config]: ConfigModules;
+  constructor(config: ConfigModules) {
+    this[$config] = config;
+  }
 
   /**
    * Hoists styles into the root context (Document or ShadowRoot)
    * Injected into host.getRootNode() as <style id="btld-hoist-{key}"></style>
    * Use <style> to support SSR with https://github.com/WebReflection/linkedom
    */
-  hoist(host: Element) {
+  [$hoist](host: Element) {
     const document = host.ownerDocument;
     const tag = host.localName;
     const rootnode = host.getRootNode();
     const root = isDocumentFragment(rootnode) ? rootnode : document;
 
-    let done = ModuleHoistStyles[$_hoisted].get(root);
-    if (!done) ModuleHoistStyles[$_hoisted].set(root, (done = new Set()));
+    let done = ModuleHoistStyles[$hoisted].get(root);
+    if (!done) ModuleHoistStyles[$hoisted].set(root, (done = new Set()));
 
-    for (const key in this.config.styles) {
+    for (const key in this[$config].styles) {
       const id = `${tag}--${key}`;
 
       // Skip previously added - we dont want to update
@@ -33,7 +39,7 @@ export class ModuleHoistStyles {
 
       const insert = document.createElement('style');
       insert.id = id;
-      insert.textContent = this.config.styles[key]
+      insert.textContent = this[$config].styles[key]
         .replaceAll('$tag', tag)
         .replace(/^(\s*)::part\(/gm, (_, ws) => `${ws}${tag}::part(`);
 

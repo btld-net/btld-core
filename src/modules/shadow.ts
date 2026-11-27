@@ -1,18 +1,23 @@
 import { ConfigModules } from '../types/config';
 import { BtldElement } from '../types/element';
 
-export const $_template = Symbol();
-export const $_normalize = Symbol();
-export const $_injectSlot = Symbol();
-export const $_injectGlobalStyle = Symbol();
-export const $_buildGlobalStyleSelector = Symbol();
+export const $config = Symbol();
+export const $attachShadow = Symbol();
+export const $template = Symbol();
+export const $normalize = Symbol();
+export const $injectSlot = Symbol();
+export const $injectGlobalStyle = Symbol();
+export const $buildGlobalStyleSelector = Symbol();
 
 export class ModuleShadowDom {
-  [$_template]: HTMLTemplateElement | undefined;
-  constructor(protected config: ConfigModules) {}
+  [$template]: HTMLTemplateElement | undefined;
+  [$config]: ConfigModules;
+  constructor(config: ConfigModules) {
+    this[$config] = config;
+  }
 
-  [$_normalize](content: DocumentFragment) {
-    const inject = new Set(this.config.injectSlots);
+  [$normalize](content: DocumentFragment) {
+    const inject = new Set(this[$config].injectSlots);
     const elements = Array.from(content.querySelectorAll('*'));
 
     const counts = new Map<string, number>();
@@ -41,14 +46,14 @@ export class ModuleShadowDom {
 
       // 3. Slots
       const doc = content.ownerDocument;
-      this[$_injectSlot](el, inject, doc, 'before');
-      this[$_injectSlot](el, inject, doc, 'after');
-      this[$_injectSlot](el, inject, doc, 'inner');
-      this[$_injectSlot](el, inject, doc, 'replace');
+      this[$injectSlot](el, inject, doc, 'before');
+      this[$injectSlot](el, inject, doc, 'after');
+      this[$injectSlot](el, inject, doc, 'inner');
+      this[$injectSlot](el, inject, doc, 'replace');
     }
   }
 
-  [$_injectSlot](element: Element, inject: Set<string>, doc: Document, kind: string) {
+  [$injectSlot](element: Element, inject: Set<string>, doc: Document, kind: string) {
     const name = `${element.id}--${kind}`;
     if (!inject.has(name)) return;
 
@@ -69,7 +74,7 @@ export class ModuleShadowDom {
     }
   }
 
-  [$_buildGlobalStyleSelector](tag: string) {
+  [$buildGlobalStyleSelector](tag: string) {
     // 'a-b-c-d' -> ['a-*', 'a-b-*', 'a-b-c-*']
     const parts = tag.split('-');
     const prefixes = parts.slice(0, -1).map((_, i) => `${parts.slice(0, i + 1).join('-')}-*`);
@@ -82,23 +87,23 @@ export class ModuleShadowDom {
    * Inject document <style> and <link> tags into the template
    * <style inject="prefix-* exact-tag"></style>
    */
-  [$_injectGlobalStyle](content: DocumentFragment) {
-    if (!this.config.tag) return;
-    const selector = this[$_buildGlobalStyleSelector](this.config.tag);
+  [$injectGlobalStyle](content: DocumentFragment) {
+    if (!this[$config].tag) return;
+    const selector = this[$buildGlobalStyleSelector](this[$config].tag);
     const elements = content.ownerDocument.querySelectorAll(selector);
     for (const el of elements) {
       content.appendChild(el.cloneNode(true));
     }
   }
 
-  attachShadow(element: BtldElement) {
+  [$attachShadow](element: BtldElement) {
     const shadow = element.attachShadow({ mode: 'open' });
-    if (!this[$_template]) {
-      const template = (this[$_template] = document.createElement('template'));
-      template.innerHTML = this.config?.shadow ?? '<slot></slot>';
-      this[$_normalize](template.content);
-      this[$_injectGlobalStyle](template.content);
+    if (!this[$template]) {
+      const template = (this[$template] = document.createElement('template'));
+      template.innerHTML = this[$config]?.shadow ?? '<slot></slot>';
+      this[$normalize](template.content);
+      this[$injectGlobalStyle](template.content);
     }
-    shadow.appendChild(this[$_template].content.cloneNode(true));
+    shadow.appendChild(this[$template].content.cloneNode(true));
   }
 }

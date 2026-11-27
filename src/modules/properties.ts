@@ -1,14 +1,24 @@
 import { BtldElement, $flagSetupDone, $propState } from '../types/element';
 import { safeDeepClone } from '../internal/utils';
 import { ConfigModules, hasDefault } from '../types/config';
+import { $reflect } from './attributes';
+
+export const $config = Symbol();
+export const $defineOnPrototype = Symbol();
+export const $constructorCapturePreupgrade = Symbol();
+export const $setupErrorOnShadowed = Symbol();
+export const $setupFallbackDefaults = Symbol();
 
 export class ModuleProperties {
-  constructor(protected config: ConfigModules) {}
+  [$config]: ConfigModules;
+  constructor(config: ConfigModules) {
+    this[$config] = config;
+  }
 
-  defineOnPrototype(prototype: any) {
-    const { moduleAttrs } = this.config;
+  [$defineOnPrototype](prototype: any) {
+    const { moduleAttrs } = this[$config];
 
-    for (const prop in this.config.props) {
+    for (const prop in this[$config].props) {
       if (prop in HTMLElement.prototype) {
         throw new Error(`Configured property "${prop}" overrides an existing property of HTMLElement.`);
       }
@@ -27,7 +37,7 @@ export class ModuleProperties {
             if (this.propertyChangedCallback) this.propertyChangedCallback(prop, old, value);
           } finally {
             // Dont use value as this might be stale, if propertyChangedCallback makes changes to it
-            moduleAttrs?.reflect(this, prop, state[prop]);
+            moduleAttrs?.[$reflect](this, prop, state[prop]);
           }
         },
         enumerable: true,
@@ -36,18 +46,18 @@ export class ModuleProperties {
     }
   }
 
-  constructorCapturePreupgrade(instance: BtldElement) {
+  [$constructorCapturePreupgrade](instance: BtldElement) {
     const state = (instance[$propState] ??= {});
-    for (const prop in this.config.props) {
+    for (const prop in this[$config].props) {
       if (Object.hasOwn(instance, prop)) state[prop] = instance[prop];
       // Delete preupgrade props to expose properties on prototype
       delete instance[prop];
     }
   }
 
-  setupErrorOnShadowed(instance: BtldElement) {
+  [$setupErrorOnShadowed](instance: BtldElement) {
     // Show error if props on the prototype are shadowed / hidden by subclass
-    for (const prop in this.config.props) {
+    for (const prop in this[$config].props) {
       if (Object.hasOwn(instance, prop)) {
         console.error(`Configured property "${prop}" is shadowed. Use "declare" instead of a class-field.`);
         // We dont rescue the value, because that might make the error acceptable since it still works
@@ -56,11 +66,11 @@ export class ModuleProperties {
     }
   }
 
-  setupFallbackDefaults(instance: BtldElement) {
+  [$setupFallbackDefaults](instance: BtldElement) {
     const state = (instance[$propState] ??= {});
-    for (const prop in this.config.props) {
-      if (!Object.hasOwn(state, prop) && hasDefault(this.config.props[prop])) {
-        state[prop] = safeDeepClone(this.config.props[prop].default);
+    for (const prop in this[$config].props) {
+      if (!Object.hasOwn(state, prop) && hasDefault(this[$config].props[prop])) {
+        state[prop] = safeDeepClone(this[$config].props[prop].default);
       }
     }
   }
