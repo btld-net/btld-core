@@ -2,12 +2,12 @@ import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin } from '../types/config';
 import { $flagSetupDone, $propState, $staticConfig } from '../types/element';
 import { hasDefault } from '../types/config';
-import { safeDeepClone } from '../internal/utils';
+import { safeDeepClone, sym } from '../internal/utils';
 import { $reflect } from './attributes';
 
-export const $constructorCapturePreupgrade = Symbol();
-export const $setupErrorOnShadowed = Symbol();
-export const $setupFallbackDefaults = Symbol();
+export const $constructorCapturePreupgrade = Symbol.for(sym + 'PropPreupgrade');
+export const $setupErrorOnShadowed = Symbol.for(sym + 'PropShadowed');
+export const $setupFallbackDefaults = Symbol.for(sym + 'PropDefaults');
 
 function defineOnPrototype(ctor: BtldElementConstructor) {
   const config = ctor[$staticConfig] ?? {};

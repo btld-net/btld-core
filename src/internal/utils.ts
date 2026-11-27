@@ -1,3 +1,5 @@
+export const sym = '@btld/core/v1/';
+
 export function templateDisallowPlaceholder(strings: TemplateStringsArray, ...values: never[]): string {
   if (values.length > 0) throw new Error('No placeholder allowed');
   return strings[0];

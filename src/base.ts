@@ -46,10 +46,6 @@ export async function base(config: Config): Promise<BtldElementConstructor> {
 
   class BtldElement extends Extended {
     static readonly [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
-    static {
-      for (const plugin of this[$staticConfig].plugins ?? []) plugin(this);
-    }
-    static readonly [$staticObservedAttrs] = this[$mergeObservedProps]?.(Extended[$staticObservedAttrs]);
 
     constructor() {
       super();
@@ -62,21 +58,27 @@ export async function base(config: Config): Promise<BtldElementConstructor> {
       super[$connectedCallback]?.();
       safeInvoke(() => this[$setupInternal]());
     }
-    [$attributeChangedCallback](name: string, _: unknown, newValue: string | null) {
+    [$attributeChangedCallback](name: string, oldValue: string | null, newValue: string | null) {
+      super[$attributeChangedCallback]?.(name, oldValue, newValue);
       this[$changed]?.(name, newValue);
     }
     [$setupInternal]() {
       if (this[$flagSetupDone]) return;
-      this[$flagSetupDone] = true;
 
       if (!this.shadowRoot) this[$attachShadow]?.();
       this[$hoist]?.();
       this[$setupErrorOnShadowed]?.();
       this[$setup]?.();
       this[$setupFallbackDefaults]?.();
+      this[$flagSetupDone] = true;
       safeInvoke(() => this[$setupCallback]?.());
     }
   }
+
+  for (const plugin of BtldElement[$staticConfig].plugins ?? []) plugin(BtldElement);
+
+  const observed = BtldElement[$mergeObservedProps]?.(Extended[$staticObservedAttrs]);
+  if (observed) BtldElement[$staticObservedAttrs] = observed;
 
   return BtldElement;
 }

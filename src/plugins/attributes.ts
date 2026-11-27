@@ -11,15 +11,15 @@ import {
   $staticConfig,
 } from '../types/element';
 import { hasDefault, hasObserve } from '../types/config';
-import { safeDeepClone } from '../internal/utils';
+import { safeDeepClone, sym } from '../internal/utils';
 
-export const $changed = Symbol();
-export const $reflect = Symbol();
-export const $setup = Symbol();
-export const $coerceAttribute = Symbol();
-export const $coercePropertyStrict = Symbol();
-export const $stoppedLoop = Symbol();
-export const $syncAttribute = Symbol();
+export const $changed = Symbol.for(sym + 'AttrChanged');
+export const $reflect = Symbol.for(sym + 'AttrReflect');
+export const $setup = Symbol.for(sym + 'AttrSetup');
+const $coerceAttribute = Symbol.for(sym + 'AttrCoerce');
+const $coercePropertyStrict = Symbol.for(sym + 'PropStrict');
+const $stoppedLoop = Symbol.for(sym + 'LoopGuard');
+const $syncAttribute = Symbol.for(sym + 'AttrSync');
 
 interface AttributeMaps {
   propToType: Map<string, ParamsObserved>;
@@ -132,8 +132,6 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
   // called by property setter
 
   proto[$reflect] ??= function (this: BtldElement, prop: string, raw: unknown) {
-    if (!this[$flagSetupDone]) return;
-
     const maps = mapsFor(this.constructor as BtldElementConstructor);
     const attr = maps.propToAttr.get(prop);
     if (!attr) return;
@@ -145,8 +143,8 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
   // called just before setupCallback
 
   proto[$setup] ??= function (this: BtldElement) {
-    // $flagSetupDone is already true, so using the property setters would fire propertyChangedCallback.
-    // To avoid that we write state directly and use the loop guard to stop changed() from running.
+    // Setup is not done yet, so property setters skip callbacks and $changed() is suppressed.
+    // Write state directly to apply precedence, then reflect explicitly.
 
     const maps = mapsFor(this.constructor as BtldElementConstructor);
     const state = (this[$propState] ??= {});

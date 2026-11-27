@@ -1,12 +1,13 @@
 import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin } from '../types/config';
 import { $staticConfig, $staticTemplate } from '../types/element';
+import { sym } from '../internal/utils';
 
-export const $attachShadow = Symbol();
-export const $normalize = Symbol();
-export const $injectSlot = Symbol();
-export const $injectGlobalStyle = Symbol();
-export const $buildGlobalStyleSelector = Symbol();
+export const $attachShadow = Symbol.for(sym + 'ShadowAttach');
+const $normalize = Symbol.for(sym + 'ShadowNormalize');
+const $injectSlot = Symbol.for(sym + 'ShadowSlot');
+const $injectGlobalStyle = Symbol.for(sym + 'ShadowStyle');
+const $buildGlobalStyleSelector = Symbol.for(sym + 'ShadowSelector');
 
 export const shadowPlugin: BtldPlugin = (ctor) => {
   const proto = ctor.prototype;
