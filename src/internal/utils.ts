@@ -1,5 +1,9 @@
 export const sym = '@btld/core/v1/';
 
+export function union<T>(...lists: (readonly T[] | undefined)[]): T[] {
+  return [...new Set(lists.flatMap((list) => list ?? []))];
+}
+
 export function templateDisallowPlaceholder(strings: TemplateStringsArray, ...values: never[]): string {
   if (values.length > 0) throw new Error('No placeholder allowed');
   return strings[0];

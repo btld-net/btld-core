@@ -5,27 +5,14 @@ import {
   $setupCallback,
   $flagSetupDone,
   $staticConfig,
-  $staticObservedAttrs,
-  $mergeObservedProps,
   $attributeChangedCallback,
 } from './types/element';
-import { safeInvokeAsTask, safeInvoke, templateDisallowPlaceholder } from './internal/utils';
+import { safeInvokeAsTask, safeInvoke, templateDisallowPlaceholder, union } from './internal/utils';
 import type { Config } from './types/config';
 import { $changed, $setup } from './plugins/attributes';
 import { $constructorCapturePreupgrade, $setupErrorOnShadowed, $setupFallbackDefaults } from './plugins/properties';
 import { $attachShadow } from './plugins/shadow';
 import { $hoist } from './plugins/styles';
-
-function mergeConfig(config: Config, inherited: Config): Config {
-  return {
-    ...inherited,
-    ...config,
-    props: { ...inherited.props, ...config.props },
-    styles: { ...inherited.styles, ...config.styles },
-    injectSlots: [...(inherited.injectSlots ?? []), ...(config.injectSlots ?? [])],
-    plugins: [...new Set([...(inherited.plugins ?? []), ...(config.plugins ?? [])])],
-  };
-}
 
 async function getExtended(config: Config): Promise<CustomElementConstructor> {
   const { tag, extend } = config;
@@ -43,9 +30,17 @@ async function waitForExtended(tag: string | undefined, extend: string): Promise
 
 export async function base(config: Config): Promise<BtldElementConstructor> {
   const Extended = (await getExtended(config)) as BtldElementConstructor;
+  const parent = Extended[$staticConfig] ?? {};
 
   class BtldElement extends Extended {
-    static readonly [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
+    static readonly [$staticConfig]: Config = {
+      ...parent,
+      ...config,
+      props: { ...parent.props, ...config.props },
+      styles: { ...parent.styles, ...config.styles },
+      injectSlots: union(parent.injectSlots, config.injectSlots),
+      plugins: union(parent.plugins, config.plugins),
+    };
 
     constructor() {
       super();
@@ -76,9 +71,6 @@ export async function base(config: Config): Promise<BtldElementConstructor> {
   }
 
   for (const plugin of BtldElement[$staticConfig].plugins ?? []) plugin(BtldElement);
-
-  const observed = BtldElement[$mergeObservedProps]?.(Extended[$staticObservedAttrs]);
-  if (observed) BtldElement[$staticObservedAttrs] = observed;
 
   return BtldElement;
 }

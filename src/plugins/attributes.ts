@@ -1,17 +1,14 @@
-import type { BtldElement, BtldElementConstructor } from '../types/element';
-import type { BtldPlugin, Config, ParamsObserved } from '../types/config';
+import type { BtldElement } from '../types/element';
+import type { BtldPlugin, ParamsObserved } from '../types/config';
 import {
-  $attrToProp,
   $flagSetupDone,
   $flagStopAttrPropLoop,
-  $mergeObservedProps,
   $propState,
-  $propToAttr,
-  $propToType,
   $staticConfig,
+  $staticObservedAttrs,
 } from '../types/element';
 import { hasDefault, hasObserve } from '../types/config';
-import { safeDeepClone, sym } from '../internal/utils';
+import { safeDeepClone, sym, union } from '../internal/utils';
 
 export const $changed = Symbol.for(sym + 'AttrChanged');
 export const $reflect = Symbol.for(sym + 'AttrReflect');
@@ -21,54 +18,34 @@ const $coercePropertyStrict = Symbol.for(sym + 'PropStrict');
 const $stoppedLoop = Symbol.for(sym + 'LoopGuard');
 const $syncAttribute = Symbol.for(sym + 'AttrSync');
 
-interface AttributeMaps {
-  propToType: Map<string, ParamsObserved>;
-  propToAttr: Map<string, string>;
-  attrToProp: Map<string, string>;
+interface ObservedProp {
+  prop: string;
+  attr: string;
+  type: ParamsObserved;
 }
 
 const toKebabCase = (str: string) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 
-function buildMaps(config: Config): AttributeMaps {
-  const propToType = new Map<string, ParamsObserved>();
-  const propToAttr = new Map<string, string>();
-  const attrToProp = new Map<string, string>();
-
-  for (const prop in config.props ?? {}) {
-    const watched = config.props![prop];
-    if (!hasObserve(watched)) continue;
-    const attr = toKebabCase(prop);
-    const existing = attrToProp.get(attr);
-    if (existing !== prop) throw new Error(`Properties "${existing}" and "${prop}" both map to attribute "${attr}".`);
-
-    propToType.set(prop, watched);
-    propToAttr.set(prop, attr);
-    attrToProp.set(attr, prop);
-  }
-
-  return { propToType, propToAttr, attrToProp };
-}
-
-function mapsFor(ctor: BtldElementConstructor): AttributeMaps {
-  if (!Object.hasOwn(ctor, $propToType)) {
-    const maps = buildMaps(ctor[$staticConfig] ?? {});
-    ctor[$propToType] = maps.propToType;
-    ctor[$propToAttr] = maps.propToAttr;
-    ctor[$attrToProp] = maps.attrToProp;
-  }
-  return {
-    propToType: ctor[$propToType]!,
-    propToAttr: ctor[$propToAttr]!,
-    attrToProp: ctor[$attrToProp]!,
-  };
-}
-
 export const attributesPlugin: BtldPlugin = (ctor) => {
   const proto = ctor.prototype;
 
-  ctor[$mergeObservedProps] ??= function (this: BtldElementConstructor, inherit: string[] = []) {
-    return [...inherit, ...mapsFor(this).propToAttr.values()];
-  };
+  const byProp = new Map<string, ObservedProp>();
+  const byAttr = new Map<string, ObservedProp>();
+  const props = ctor[$staticConfig]?.props ?? {};
+
+  for (const [prop, type] of Object.entries(props)) {
+    if (!hasObserve(type)) continue;
+    const attr = toKebabCase(prop);
+    const existing = byAttr.get(attr);
+    if (existing) throw new Error(`Properties "${existing.prop}" and "${prop}" both map to attribute "${attr}".`);
+
+    const observed = { prop, attr, type };
+    byProp.set(prop, observed);
+    byAttr.set(attr, observed);
+  }
+
+  const observedAttrs = Array.from(byProp.values(), (observed) => observed.attr);
+  ctor[$staticObservedAttrs] = union(ctor[$staticObservedAttrs], observedAttrs);
 
   proto[$coerceAttribute] ??= function (value: string | null, type: ParamsObserved) {
     if (type.observe === 'boolean') return value !== null;
@@ -110,15 +87,14 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
 
   // called by attributeChangedCallback
 
-  proto[$changed] ??= function (this: BtldElement, attr: string, raw: string | null) {
+  proto[$changed] = function (this: BtldElement, attr: string, raw: string | null) {
     if (!this[$flagSetupDone]) return;
     this[$propState] ??= {};
 
-    const maps = mapsFor(this.constructor as BtldElementConstructor);
-    const prop = maps.attrToProp.get(attr);
-    if (!prop) return;
+    const observed = byAttr.get(attr);
+    if (!observed) return;
 
-    const type = maps.propToType.get(prop)!;
+    const { prop, type } = observed;
     const value = this[$coerceAttribute](raw, type);
 
     if (this[$stoppedLoop](prop, () => ((this as any)[prop] = value))) return;
@@ -131,27 +107,22 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
 
   // called by property setter
 
-  proto[$reflect] ??= function (this: BtldElement, prop: string, raw: unknown) {
-    const maps = mapsFor(this.constructor as BtldElementConstructor);
-    const attr = maps.propToAttr.get(prop);
-    if (!attr) return;
+  proto[$reflect] = function (this: BtldElement, prop: string, raw: unknown) {
+    const observed = byProp.get(prop);
+    if (!observed) return;
 
-    const type = maps.propToType.get(prop)!;
-    this[$stoppedLoop](prop, () => this[$syncAttribute](type, attr, raw));
+    this[$stoppedLoop](prop, () => this[$syncAttribute](observed.type, observed.attr, raw));
   };
 
   // called just before setupCallback
 
-  proto[$setup] ??= function (this: BtldElement) {
+  proto[$setup] = function (this: BtldElement) {
     // Setup is not done yet, so property setters skip callbacks and $changed() is suppressed.
     // Write state directly to apply precedence, then reflect explicitly.
 
-    const maps = mapsFor(this.constructor as BtldElementConstructor);
     const state = (this[$propState] ??= {});
 
-    for (const [prop, type] of maps.propToType) {
-      const attr = maps.propToAttr.get(prop)!;
-
+    for (const { prop, attr, type } of byProp.values()) {
       if (Object.hasOwn(state, prop)) {
         // PRECEDENCE 1: has preupgrade property or was manually assigned
       } else if (type.observe === 'boolean' || this.hasAttribute(attr)) {

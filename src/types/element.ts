@@ -1,13 +1,9 @@
-import type { Config, ParamsObserved } from './config';
+import type { Config } from './config';
 import { sym } from '../internal/utils';
 
 export const $staticConfig = Symbol.for(sym + 'ElConfig');
 export const $staticTemplate = Symbol.for(sym + 'ElTemplate');
 export const $staticObservedAttrs = 'observedAttributes';
-export const $mergeObservedProps = Symbol.for(sym + 'AttrObserved');
-export const $propToType = Symbol.for(sym + 'PropTypes');
-export const $propToAttr = Symbol.for(sym + 'PropAttrs');
-export const $attrToProp = Symbol.for(sym + 'AttrProps');
 export const $hoisted = Symbol.for(sym + 'StyleHoisted');
 
 export const $setupInternal = Symbol.for(sym + 'ElSetup');
@@ -25,10 +21,6 @@ export interface BtldElementConstructor<Instance extends BtldElement = BtldEleme
   [$staticConfig]?: Config;
   [$staticTemplate]?: HTMLTemplateElement;
   [$staticObservedAttrs]?: string[];
-  [$mergeObservedProps]?: (inherit?: string[]) => string[];
-  [$propToType]?: Map<string, ParamsObserved>;
-  [$propToAttr]?: Map<string, string>;
-  [$attrToProp]?: Map<string, string>;
   [$hoisted]?: WeakMap<Document | DocumentFragment, Set<string>>;
   new (...params: any[]): Instance;
 }
