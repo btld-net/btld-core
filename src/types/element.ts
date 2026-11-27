@@ -9,7 +9,7 @@ export const $hoisted = Symbol.for(sym + 'StyleHoisted');
 export const $setupInternal = Symbol.for(sym + 'ElSetup');
 export const $setupCallback = 'setupCallback';
 export const $connectedCallback = 'connectedCallback';
-const $propertyChangedCallback = 'propertyChangedCallback';
+export const $propertyChangedCallback = 'propertyChangedCallback';
 export const $attributeChangedCallback = 'attributeChangedCallback';
 
 export const $propState = Symbol.for(sym + 'PropState');

@@ -1,6 +1,6 @@
 import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin } from '../types/config';
-import { $flagSetupDone, $propState, $staticConfig } from '../types/element';
+import { $flagSetupDone, $propState, $propertyChangedCallback, $staticConfig } from '../types/element';
 import { hasDefault } from '../types/config';
 import { safeDeepClone, sym } from '../internal/utils';
 import { $reflect } from './attributes';
@@ -28,7 +28,7 @@ function defineOnPrototype(ctor: BtldElementConstructor) {
 
         if (!this[$flagSetupDone]) return;
         try {
-          if (this.propertyChangedCallback) this.propertyChangedCallback(prop, old, value);
+          if (this[$propertyChangedCallback]) this[$propertyChangedCallback](prop, old, value);
         } finally {
           // Dont use value as this might be stale, if propertyChangedCallback makes changes to it
           this[$reflect]?.(prop, state[prop]);
