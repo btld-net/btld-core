@@ -1,9 +1,8 @@
 import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin } from '../types/config';
-import { $staticConfig } from '../types/element';
+import { $hoisted, $staticConfig } from '../types/element';
 
 export const $hoist = Symbol();
-export const $hoisted = Symbol();
 
 const isDocument = (node: Node): node is Document => node.nodeType === 9;
 const isDocumentFragment = (node: Node): node is DocumentFragment => node.nodeType === 11;

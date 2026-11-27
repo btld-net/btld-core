@@ -1,19 +1,23 @@
 import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin, Config, ParamsObserved } from '../types/config';
-import { $flagSetupDone, $flagStopAttrPropLoop, $propState, $staticConfig } from '../types/element';
+import {
+  $attrToProp,
+  $flagSetupDone,
+  $flagStopAttrPropLoop,
+  $mergeObservedProps,
+  $propState,
+  $propToAttr,
+  $propToType,
+  $staticConfig,
+} from '../types/element';
 import { hasDefault, hasObserve } from '../types/config';
 import { safeDeepClone } from '../internal/utils';
 
-export const $observed = Symbol();
 export const $changed = Symbol();
 export const $reflect = Symbol();
 export const $setup = Symbol();
-export const $propToType = Symbol();
-export const $propToAttr = Symbol();
-export const $attrToProp = Symbol();
 export const $coerceAttribute = Symbol();
 export const $coercePropertyStrict = Symbol();
-export const $toKebabCase = Symbol();
 export const $stoppedLoop = Symbol();
 export const $syncAttribute = Symbol();
 
@@ -53,21 +57,17 @@ function mapsFor(ctor: BtldElementConstructor): AttributeMaps {
     ctor[$attrToProp] = maps.attrToProp;
   }
   return {
-    propToType: ctor[$propToType],
-    propToAttr: ctor[$propToAttr],
-    attrToProp: ctor[$attrToProp],
+    propToType: ctor[$propToType]!,
+    propToAttr: ctor[$propToAttr]!,
+    attrToProp: ctor[$attrToProp]!,
   };
 }
 
 export const attributesPlugin: BtldPlugin = (ctor) => {
   const proto = ctor.prototype;
 
-  ctor[$observed] ??= function (this: BtldElementConstructor, inherit: string[] = []) {
+  ctor[$mergeObservedProps] ??= function (this: BtldElementConstructor, inherit: string[] = []) {
     return [...inherit, ...mapsFor(this).propToAttr.values()];
-  };
-
-  proto[$toKebabCase] ??= function (str: string): string {
-    return toKebabCase(str);
   };
 
   proto[$coerceAttribute] ??= function (value: string | null, type: ParamsObserved) {

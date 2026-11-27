@@ -1,5 +1,5 @@
-import { Config } from './types/config';
-import { BtldElementConstructor } from './types/element';
+import type { Config } from './types/config';
+import type { BtldElementConstructor } from './types/element';
 import { attributesPlugin } from './plugins/attributes';
 import { propertiesPlugin } from './plugins/properties';
 import { shadowPlugin } from './plugins/shadow';

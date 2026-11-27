@@ -5,7 +5,6 @@ import { hasDefault } from '../types/config';
 import { safeDeepClone } from '../internal/utils';
 import { $reflect } from './attributes';
 
-export const $defineOnPrototype = Symbol();
 export const $constructorCapturePreupgrade = Symbol();
 export const $setupErrorOnShadowed = Symbol();
 export const $setupFallbackDefaults = Symbol();
@@ -42,10 +41,7 @@ function defineOnPrototype(ctor: BtldElementConstructor) {
 }
 
 export const propertiesPlugin: BtldPlugin = (ctor) => {
-  ctor[$defineOnPrototype] ??= function (this: BtldElementConstructor) {
-    defineOnPrototype(this);
-  };
-  ctor[$defineOnPrototype]();
+  defineOnPrototype(ctor);
 
   const proto = ctor.prototype;
 

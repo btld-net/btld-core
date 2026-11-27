@@ -1,9 +1,8 @@
 import type { BtldElement, BtldElementConstructor } from '../types/element';
 import type { BtldPlugin } from '../types/config';
-import { $staticConfig } from '../types/element';
+import { $staticConfig, $staticTemplate } from '../types/element';
 
 export const $attachShadow = Symbol();
-export const $template = Symbol();
 export const $normalize = Symbol();
 export const $injectSlot = Symbol();
 export const $injectGlobalStyle = Symbol();
@@ -104,15 +103,15 @@ export const shadowPlugin: BtldPlugin = (ctor) => {
     const ctor = this.constructor as BtldElementConstructor;
     const shadow = this.attachShadow({ mode: 'open' });
 
-    if (!Object.hasOwn(ctor, $template)) {
+    if (!Object.hasOwn(ctor, $staticTemplate)) {
       const config = ctor[$staticConfig] ?? {};
       const template = document.createElement('template');
       template.innerHTML = config.shadow ?? '<slot></slot>';
       this[$normalize](template.content);
       this[$injectGlobalStyle](template.content);
-      ctor[$template] = template;
+      ctor[$staticTemplate] = template;
     }
 
-    shadow.appendChild((ctor[$template] as HTMLTemplateElement).content.cloneNode(true));
+    shadow.appendChild((ctor[$staticTemplate] as HTMLTemplateElement).content.cloneNode(true));
   };
 };

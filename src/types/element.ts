@@ -1,8 +1,13 @@
-import type { Config } from './config';
+import type { Config, ParamsObserved } from './config';
 
 export const $staticConfig = Symbol();
 export const $staticTemplate = Symbol();
 export const $staticObservedAttrs = 'observedAttributes';
+export const $mergeObservedProps = Symbol();
+export const $propToType = Symbol();
+export const $propToAttr = Symbol();
+export const $attrToProp = Symbol();
+export const $hoisted = Symbol();
 
 export const $setupInternal = Symbol();
 export const $setupCallback = 'setupCallback';
@@ -16,10 +21,14 @@ export const $flagStopAttrPropLoop = Symbol();
 
 export interface BtldElementConstructor<Instance extends BtldElement = BtldElement> {
   readonly prototype: Instance;
-  [key: symbol]: any;
   [$staticConfig]?: Config;
   [$staticTemplate]?: HTMLTemplateElement;
   [$staticObservedAttrs]?: string[];
+  [$mergeObservedProps]: (inherit?: string[]) => string[];
+  [$propToType]?: Map<string, ParamsObserved>;
+  [$propToAttr]?: Map<string, string>;
+  [$attrToProp]?: Map<string, string>;
+  [$hoisted]?: WeakMap<Document | DocumentFragment, Set<string>>;
   new (...params: any[]): Instance;
 }
 

@@ -1,17 +1,18 @@
+import type { BtldElementConstructor } from './types/element';
 import {
-  BtldElementConstructor,
   $connectedCallback,
   $setupInternal,
   $setupCallback,
   $flagSetupDone,
   $staticConfig,
   $staticObservedAttrs,
+  $mergeObservedProps,
   $attributeChangedCallback,
 } from './types/element';
 import { safeInvokeAsTask, safeInvoke, templateDisallowPlaceholder } from './internal/utils';
-import { Config } from './types/config';
-import { $changed, $observed, $setup } from './plugins/attributes';
-import { $setupErrorOnShadowed, $setupFallbackDefaults } from './plugins/properties';
+import type { Config } from './types/config';
+import { $changed, $setup } from './plugins/attributes';
+import { $constructorCapturePreupgrade, $setupErrorOnShadowed, $setupFallbackDefaults } from './plugins/properties';
 import { $attachShadow } from './plugins/shadow';
 import { $hoist } from './plugins/styles';
 
@@ -42,11 +43,17 @@ async function waitForExtended(tag: string | undefined, extend: string): Promise
 
 export async function base(config: Config): Promise<BtldElementConstructor> {
   const Extended = (await getExtended(config)) as BtldElementConstructor;
+
   class BtldElement extends Extended {
-    static [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
+    static readonly [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
+    static {
+      for (const plugin of this[$staticConfig].plugins ?? []) plugin(this);
+    }
+    static readonly [$staticObservedAttrs] = this[$mergeObservedProps]?.(Extended[$staticObservedAttrs]);
 
     constructor() {
       super();
+      this[$constructorCapturePreupgrade]?.();
       // Use setTimeout instead of a microtask. When the parser creates an element synchronously during page load, a
       // microtask checkpoint runs right after the constructor and any setAttribute in it would throw the NotSupportedError
       safeInvokeAsTask(() => this[$setupInternal]());
@@ -69,16 +76,6 @@ export async function base(config: Config): Promise<BtldElementConstructor> {
       this[$setupFallbackDefaults]?.();
       safeInvoke(() => this[$setupCallback]?.());
     }
-  }
-
-  for (const plugin of BtldElement[$staticConfig].plugins ?? []) plugin(BtldElement);
-
-  const observed = BtldElement[$observed];
-  if (observed) {
-    Object.defineProperty(BtldElement, $staticObservedAttrs, {
-      value: observed.call(BtldElement, Extended[$staticObservedAttrs] ?? []),
-      configurable: true,
-    });
   }
 
   return BtldElement;
