@@ -9,23 +9,24 @@ import {
   $attributeChangedCallback,
 } from './types/element';
 import { safeInvokeAsTask, safeInvoke, templateDisallowPlaceholder } from './internal/utils';
-import { ConfigModules, instantiateModules } from './types/config';
-import { $changed, $observed, $setup } from './modules/attributes';
-import { $defineOnPrototype, $setupErrorOnShadowed, $setupFallbackDefaults } from './modules/properties';
-import { $attachShadow } from './modules/shadow';
-import { $hoist } from './modules/styles';
+import { Config } from './types/config';
+import { $changed, $observed, $setup } from './plugins/attributes';
+import { $setupErrorOnShadowed, $setupFallbackDefaults } from './plugins/properties';
+import { $attachShadow } from './plugins/shadow';
+import { $hoist } from './plugins/styles';
 
-function mergeConfig(config: ConfigModules, inherited: ConfigModules): ConfigModules {
-  return instantiateModules({
+function mergeConfig(config: Config, inherited: Config): Config {
+  return {
     ...inherited,
     ...config,
     props: { ...inherited.props, ...config.props },
     styles: { ...inherited.styles, ...config.styles },
     injectSlots: [...(inherited.injectSlots ?? []), ...(config.injectSlots ?? [])],
-  });
+    plugins: [...new Set([...(inherited.plugins ?? []), ...(config.plugins ?? [])])],
+  };
 }
 
-async function getExtended(config: ConfigModules): Promise<CustomElementConstructor> {
+async function getExtended(config: Config): Promise<CustomElementConstructor> {
   const { tag, extend } = config;
   if (typeof extend !== 'string') return extend ?? HTMLElement;
   if (!customElements.get(extend)) await waitForExtended(tag, extend);
@@ -39,11 +40,10 @@ async function waitForExtended(tag: string | undefined, extend: string): Promise
   clearTimeout(timer);
 }
 
-export async function base(config: ConfigModules): Promise<BtldElementConstructor> {
+export async function base(config: Config): Promise<BtldElementConstructor> {
   const Extended = (await getExtended(config)) as BtldElementConstructor;
   class BtldElement extends Extended {
-    static readonly [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
-    static readonly [$staticObservedAttrs] = this[$staticConfig].moduleAttrs?.[$observed](super[$staticObservedAttrs]);
+    static [$staticConfig] = mergeConfig(config, Extended[$staticConfig] ?? {});
 
     constructor() {
       super();
@@ -56,24 +56,30 @@ export async function base(config: ConfigModules): Promise<BtldElementConstructo
       safeInvoke(() => this[$setupInternal]());
     }
     [$attributeChangedCallback](name: string, _: unknown, newValue: string | null) {
-      const ctor = this.constructor as BtldElementConstructor;
-      ctor[$staticConfig]?.moduleAttrs?.[$changed](this, name, newValue);
+      this[$changed]?.(name, newValue);
     }
     [$setupInternal]() {
       if (this[$flagSetupDone]) return;
       this[$flagSetupDone] = true;
 
-      const ctor = this.constructor as BtldElementConstructor;
-      if (!this.shadowRoot) ctor[$staticConfig]?.moduleShadow?.[$attachShadow](this);
-      ctor[$staticConfig]?.moduleHoist?.[$hoist](this);
-      ctor[$staticConfig]?.moduleProps?.[$setupErrorOnShadowed](this);
-      ctor[$staticConfig]?.moduleAttrs?.[$setup](this);
-      ctor[$staticConfig]?.moduleProps?.[$setupFallbackDefaults](this);
+      if (!this.shadowRoot) this[$attachShadow]?.();
+      this[$hoist]?.();
+      this[$setupErrorOnShadowed]?.();
+      this[$setup]?.();
+      this[$setupFallbackDefaults]?.();
       safeInvoke(() => this[$setupCallback]?.());
     }
   }
 
-  BtldElement[$staticConfig].moduleProps?.[$defineOnPrototype](BtldElement.prototype);
+  for (const plugin of BtldElement[$staticConfig].plugins ?? []) plugin(BtldElement);
+
+  const observed = BtldElement[$observed];
+  if (observed) {
+    Object.defineProperty(BtldElement, $staticObservedAttrs, {
+      value: observed.call(BtldElement, Extended[$staticObservedAttrs] ?? []),
+      configurable: true,
+    });
+  }
 
   return BtldElement;
 }

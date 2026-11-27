@@ -1,4 +1,4 @@
-import { ConfigModules } from './config';
+import type { Config } from './config';
 
 export const $staticConfig = Symbol();
 export const $staticTemplate = Symbol();
@@ -15,13 +15,16 @@ export const $flagSetupDone = Symbol();
 export const $flagStopAttrPropLoop = Symbol();
 
 export interface BtldElementConstructor<Instance extends BtldElement = BtldElement> {
-  [$staticConfig]?: ConfigModules;
+  readonly prototype: Instance;
+  [key: symbol]: any;
+  [$staticConfig]?: Config;
   [$staticTemplate]?: HTMLTemplateElement;
   [$staticObservedAttrs]?: string[];
   new (...params: any[]): Instance;
 }
 
 export interface BtldElement extends HTMLElement {
+  [key: symbol]: any;
   [$setupInternal]?(): void;
   [$setupCallback]?(): void;
   [$connectedCallback]?(): void;

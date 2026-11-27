@@ -1,7 +1,4 @@
-import type { ModuleAttributes } from '../modules/attributes';
-import type { ModuleProperties } from '../modules/properties';
-import type { ModuleShadowDom } from '../modules/shadow';
-import type { ModuleHoistStyles } from '../modules/styles';
+import type { BtldElementConstructor } from './element';
 
 export interface Config {
   tag?: string;
@@ -11,7 +8,10 @@ export interface Config {
   props?: ConfigParams;
   injectSlots?: string[];
   injectStyles?: boolean;
+  plugins?: BtldPlugin[];
 }
+
+export type BtldPlugin = (ctor: BtldElementConstructor) => void;
 
 export type ConfigParams = Record<string, ParamsWatched | ParamsObserved>;
 
@@ -40,23 +40,4 @@ export function hasObserve(watched: ParamsWatched | ParamsObserved): watched is 
 
 export function hasDefault(watched: ParamsWatched | ParamsObserved): watched is { default: unknown } {
   return typeof watched === 'object' && 'default' in watched;
-}
-
-export interface ConfigModules extends Config {
-  ModuleShadowCtor?: typeof ModuleShadowDom;
-  moduleShadow?: ModuleShadowDom;
-  ModuleHoistCtor?: typeof ModuleHoistStyles;
-  moduleHoist?: ModuleHoistStyles;
-  ModuleAttrsCtor?: typeof ModuleAttributes;
-  moduleAttrs?: ModuleAttributes;
-  ModulePropsCtor?: typeof ModuleProperties;
-  moduleProps?: ModuleProperties;
-}
-
-export function instantiateModules(config: ConfigModules): ConfigModules {
-  if (config.ModuleShadowCtor) config.moduleShadow = new config.ModuleShadowCtor(config);
-  if (config.ModuleHoistCtor) config.moduleHoist = new config.ModuleHoistCtor(config);
-  if (config.ModuleAttrsCtor) config.moduleAttrs = new config.ModuleAttrsCtor(config);
-  if (config.ModulePropsCtor) config.moduleProps = new config.ModulePropsCtor(config);
-  return config;
 }
