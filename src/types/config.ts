@@ -2,7 +2,7 @@ import type { BtldElementConstructor } from './element';
 
 export interface Config {
   tag?: string;
-  extend?: string | CustomElementConstructor;
+  extend?: string | BtldElementConstructor;
   shadow?: string;
   styles?: Record<string, string>;
   props?: ConfigParams;

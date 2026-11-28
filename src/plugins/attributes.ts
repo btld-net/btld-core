@@ -1,6 +1,7 @@
 import type { BtldElement } from '../types/element';
 import type { BtldPlugin, ParamsObserved } from '../types/config';
 import {
+  $attributeChangedCallback,
   $flagSetupDone,
   $flagStopAttrPropLoop,
   $propState,
@@ -46,6 +47,12 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
 
   const observedAttrs = Array.from(byProp.values(), (observed) => observed.attr);
   ctor[$staticObservedAttrs] = union(ctor[$staticObservedAttrs], observedAttrs);
+
+  proto[$attributeChangedCallback] ??= function (this: BtldElement, name: string, _oldValue : string | null, newValue: string | null) {
+    // we can only extend btld elements - the first in the chain calls [$changed]
+    // overrides have to call super[$attributeChangedCallback]
+    this[$changed]?.(name, newValue);
+  }
 
   proto[$coerceAttribute] ??= function (value: string | null, type: ParamsObserved) {
     if (type.observe === 'boolean') return value !== null;
@@ -109,7 +116,7 @@ export const attributesPlugin: BtldPlugin = (ctor) => {
 
   proto[$reflect] = function (this: BtldElement, prop: string, raw: unknown) {
     const observed = byProp.get(prop);
-    if (!observed) return;
+    if (!observed?.type.reflect) return;
 
     this[$stoppedLoop](prop, () => this[$syncAttribute](observed.type, observed.attr, raw));
   };

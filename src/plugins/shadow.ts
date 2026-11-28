@@ -18,6 +18,8 @@ export const shadowPlugin: BtldPlugin = (ctor) => {
     const elements = Array.from(content.querySelectorAll('*'));
 
     const counts = new Map<string, number>();
+    const ids = new Set<string>();
+    
     for (const el of elements) {
       const tag = el.localName;
       counts.set(tag, (counts.get(tag) || 0) + 1);
@@ -32,11 +34,14 @@ export const shadowPlugin: BtldPlugin = (ctor) => {
       if (tag === 'slot') {
         const name = el.getAttribute('name');
         if (name === 'default') throw Error('<slot name="default"> is not allowed');
+        if (name?.includes('--')) throw Error(`Slot name "${name}" cannot contain "--"`);
         el.id ||= name ? `slot--${name}` : 'slot--default';
       }
 
       if (!el.id && counts.get(tag) === 1) el.id = tag;
       if (!el.id) throw Error(`Element <${tag}> must have an ID.`);
+      if (ids.has(el.id)) throw Error(`ID "${el.id}" is not unique.`);
+      ids.add(el.id);
 
       // 2. Part
       if (!el.getAttribute('part')) el.setAttribute('part', `${el.id} tag--${tag}`);
@@ -102,8 +107,8 @@ export const shadowPlugin: BtldPlugin = (ctor) => {
 
   proto[$attachShadow] ??= function (this: BtldElement) {
     const ctor = this.constructor as BtldElementConstructor;
-    const shadow = this.attachShadow({ mode: 'open' });
 
+    // Build and validate the template before attaching, so a normalization error does not leave an empty shadow root.
     if (!Object.hasOwn(ctor, $staticTemplate)) {
       const config = ctor[$staticConfig] ?? {};
       const template = document.createElement('template');
@@ -113,6 +118,7 @@ export const shadowPlugin: BtldPlugin = (ctor) => {
       ctor[$staticTemplate] = template;
     }
 
+    const shadow = this.attachShadow({ mode: 'open' });
     shadow.appendChild((ctor[$staticTemplate] as HTMLTemplateElement).content.cloneNode(true));
   };
 };

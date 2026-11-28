@@ -5,31 +5,31 @@ import {
   $setupCallback,
   $flagSetupDone,
   $staticConfig,
-  $attributeChangedCallback,
 } from './types/element';
 import { safeInvokeAsTask, safeInvoke, templateDisallowPlaceholder, union } from './internal/utils';
 import type { Config } from './types/config';
-import { $changed, $setup } from './plugins/attributes';
+import { $setup } from './plugins/attributes';
 import { $constructorCapturePreupgrade, $setupErrorOnShadowed, $setupFallbackDefaults } from './plugins/properties';
 import { $attachShadow } from './plugins/shadow';
 import { $hoist } from './plugins/styles';
 
-async function getExtended(config: Config): Promise<CustomElementConstructor> {
-  const { tag, extend } = config;
-  if (typeof extend !== 'string') return extend ?? HTMLElement;
-  if (!customElements.get(extend)) await waitForExtended(tag, extend);
-  return customElements.get(extend)!;
+async function getExtended({ tag, extend }: Config): Promise<BtldElementConstructor> {
+  if (!extend) return HTMLElement as BtldElementConstructor;
+  return typeof extend === 'string' ? await resolveExtend(tag, extend) : extend;
 }
 
-async function waitForExtended(tag: string | undefined, extend: string): Promise<void> {
-  const warn = () => console.warn(`<${tag}> waiting on <${extend}> (>10s)`);
-  const timer = setTimeout(warn, 10_000);
-  await customElements.whenDefined(extend);
-  clearTimeout(timer);
+async function resolveExtend(tag: string | undefined, extend: string): Promise<BtldElementConstructor> {
+  if (!customElements.get(extend)) {
+    const timer = setTimeout(() => console.warn(`<${tag}> waiting on <${extend}> (>10s)`), 10_000);
+    await customElements.whenDefined(extend).finally(() => clearTimeout(timer));
+  }
+  const ctor = customElements.get(extend) as BtldElementConstructor;
+  if (!ctor[$staticConfig]) throw Error(`Cannot extend <${extend}>, not a Btld component.`);
+  return ctor;
 }
 
 export async function base(config: Config): Promise<BtldElementConstructor> {
-  const Extended = (await getExtended(config)) as BtldElementConstructor;
+  const Extended = await getExtended(config);
   const parent = Extended[$staticConfig] ?? {};
 
   class BtldElement extends Extended {
@@ -52,10 +52,6 @@ export async function base(config: Config): Promise<BtldElementConstructor> {
     [$connectedCallback]() {
       super[$connectedCallback]?.();
       safeInvoke(() => this[$setupInternal]());
-    }
-    [$attributeChangedCallback](name: string, oldValue: string | null, newValue: string | null) {
-      super[$attributeChangedCallback]?.(name, oldValue, newValue);
-      this[$changed]?.(name, newValue);
     }
     [$setupInternal]() {
       if (this[$flagSetupDone]) return;
